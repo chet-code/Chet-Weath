@@ -1,319 +1,584 @@
-import React, { useState, useEffect } from 'react';
-import { Search, CloudRain, Sun, CloudDrizzle, CloudLightning, CloudSnow, Wind, Thermometer, Droplets, Clock } from 'lucide-react';
-
-// Constants moved to separate section at top
-const INDIAN_CITIES = [
-  "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Kolkata", 
-  "Pune", "Ahmedabad", "Jaipur", "Lucknow", "Kanpur", "Nagpur", 
-  "Indore", "Thane", "Bhopal", "Visakhapatnam", "Patna", "Vadodara", 
-  "Buldhana", "Shimla", "Dehradun", "Rishikesh", "Haridwar", "Darjeeling",
-  "Gangtok", "Ooty", "Manali", "Pondicherry", "Port Blair", "Shillong"
-];
-
-const STATE_CITIES = {
-  // ... (keep existing state cities mapping)
-};
-
-// Improved weather emoji mapping with better emoji representation
-const weatherEmojis = {
-  'Clear': '☀️',
-  'Mainly clear': '🌤️',
-  'Partly cloudy': '⛅',
-  'Overcast': '☁️',
-  'Fog': '🌫️',
-  'Depositing rime fog': '🌫️',
-  'Light drizzle': '🌦️',
-  'Moderate drizzle': '🌧️',
-  'Dense drizzle': '🌧️',
-  'Light freezing drizzle': '🌧️❄️',
-  'Dense freezing drizzle': '🌧️❄️',
-  'Slight rain': '🌦️',
-  'Moderate rain': '🌧️',
-  'Heavy rain': '🌧️',
-  'Light freezing rain': '🌧️❄️',
-  'Heavy freezing rain': '🌧️❄️',
-  'Slight snow fall': '🌨️',
-  'Moderate snow fall': '❄️',
-  'Heavy snow fall': '❄️',
-  'Snow grains': '❄️',
-  'Slight rain showers': '🌦️',
-  'Moderate rain showers': '🌧️',
-  'Violent rain showers': '🌧️',
-  'Slight snow showers': '🌨️',
-  'Heavy snow showers': '❄️',
-  'Thunderstorm': '⛈️',
-  'Thunderstorm with slight hail': '⛈️',
-  'Thunderstorm with heavy hail': '⛈️',
-  'default': '🌈'
-};
-
-// Main component with improvements
-const WeatherApp = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCity, setSelectedCity] = useState('Mumbai');
-  const [weather, setWeather] = useState(null);
-  const [hourlyWeather, setHourlyWeather] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [filteredCities, setFilteredCities] = useState([]);
-  const [selectedState, setSelectedState] = useState('');
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
-  const [cities, setCities] = useState(INDIAN_CITIES);
-  const [selectedDay, setSelectedDay] = useState(null);
-
-  // Improved city filtering with debounce
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchTerm.length > 0) {
-        const filtered = cities.filter(city => 
-          city.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        setFilteredCities(filtered);
-        setShowCityDropdown(true);
-      } else {
-        setFilteredCities([]);
-        setShowCityDropdown(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, cities]);
-
-  // Fetch weather data with error handling improvements
-  const fetchWeather = async (city) => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      const coords = getCoordinates(city);
-      
-      // Using Promise.all for parallel requests
-      const [dailyResponse, hourlyResponse] = await Promise.all([
-        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,relative_humidity_2m_max&current=temperature_2m,relative_humidity_2m,rain,weathercode,windspeed_10m&timezone=auto`),
-        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weathercode,windspeed_10m&timezone=auto`)
-      ]);
-
-      if (!dailyResponse.ok || !hourlyResponse.ok) {
-        throw new Error('Failed to fetch weather data');
-      }
-
-      const [dailyData, hourlyData] = await Promise.all([
-        dailyResponse.json(),
-        hourlyResponse.json()
-      ]);
-
-      // Process data
-      const transformedHourlyData = processHourlyData(hourlyData);
-      const transformedData = processDailyData(dailyData, city);
-      
-      setHourlyWeather(transformedHourlyData);
-      setWeather(transformedData);
-      setSelectedCity(city);
-      
-      // Set first day as selected by default
-      if (transformedData.forecast?.forecastday?.length > 0) {
-        setSelectedDay(transformedData.forecast.forecastday[0].time);
-      }
-    } catch (err) {
-      console.error("Error fetching weather:", err);
-      setError(err.message || 'Error fetching weather data');
-    } finally {
-      setLoading(false);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>India Weather App</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide-react@latest"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(to bottom, #ebf4ff, #b3d1ff);
+      min-height: 100vh;
     }
-  };
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+    .bg-gradient-header {
+      background: linear-gradient(to right, #1e3a8a, #2563eb);
+    }
+    .weather-card {
+      transition: all 0.3s ease;
+    }
+    .weather-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .loading-spinner {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
 
-  // Helper function to process hourly data
-  const processHourlyData = (hourlyData) => {
-    return hourlyData.hourly.time.map((time, index) => ({
-      time,
-      temperature_2m: hourlyData.hourly.temperature_2m[index],
-      relative_humidity_2m: hourlyData.hourly.relative_humidity_2m[index],
-      precipitation_probability: hourlyData.hourly.precipitation_probability[index],
-      weathercode: hourlyData.hourly.weathercode[index],
-      windspeed_10m: hourlyData.hourly.windspeed_10m[index]
-    }));
-  };
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const { Search, CloudRain, Sun, CloudDrizzle, CloudLightning, CloudSnow, Wind, Thermometer, Droplets, Clock } = lucideReact;
 
-  // Helper function to process daily data
-  const processDailyData = (dailyData, city) => {
-    return {
-      location: {
-        name: city,
-        country: "India",
-        localtime: new Date().toISOString()
-      },
-      current: {
-        temp_c: dailyData.current.temperature_2m,
-        condition: {
-          text: getWeatherEmoji(dailyData.current.weathercode).description,
-          weathercode: dailyData.current.weathercode
-        },
-        wind_kph: dailyData.current.windspeed_10m,
-        humidity: dailyData.current.relative_humidity_2m,
-        feelslike_c: dailyData.current.temperature_2m,
-        precip_mm: dailyData.current.rain || 0,
-      },
-      forecast: {
-        forecastday: dailyData.daily.time.map((time, index) => ({
-          time,
-          weathercode: dailyData.daily.weathercode[index],
-          temperature_2m_max: dailyData.daily.temperature_2m_max[index],
-          temperature_2m_min: dailyData.daily.temperature_2m_min[index],
-          precipitation_probability_max: dailyData.daily.precipitation_probability_max[index],
-          relative_humidity_2m_max: dailyData.daily.relative_humidity_2m_max[index]
-        }))
+    // Fix for GitHub Pages routing
+    if (window.location.host.includes('github.io')) {
+      const pathname = window.location.pathname;
+      if (!pathname.includes('/weather-app') && !pathname.endsWith('.html')) {
+        window.location.replace('/weather-app/index.html');
       }
+    }
+
+    // Data
+    const INDIAN_CITIES = [
+      "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Kolkata", 
+      "Pune", "Ahmedabad", "Jaipur", "Lucknow", "Kanpur", "Nagpur", 
+      "Indore", "Thane", "Bhopal", "Visakhapatnam", "Patna", "Vadodara", 
+      "Buldhana", "Shimla", "Dehradun", "Rishikesh", "Haridwar", "Darjeeling",
+      "Gangtok", "Ooty", "Manali", "Pondicherry", "Port Blair", "Shillong"
+    ];
+
+    const STATE_CITIES = {
+      "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Thane", "Aurangabad", "Nashik", "Buldhana", "Amravati"],
+      "Delhi": ["Delhi", "New Delhi"],
+      "Karnataka": ["Bangalore", "Mysore", "Hubli", "Mangalore", "Belgaum"],
+      "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Salem", "Tiruchirapalli"],
+      "Uttar Pradesh": ["Lucknow", "Kanpur", "Agra", "Varanasi", "Meerut", "Allahabad"],
+      "West Bengal": ["Kolkata", "Darjeeling", "Siliguri", "Durgapur", "Asansol"],
+      "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar"],
+      "Rajasthan": ["Jaipur", "Jodhpur", "Udaipur", "Kota", "Bikaner"],
+      "Madhya Pradesh": ["Bhopal", "Indore", "Jabalpur", "Gwalior", "Ujjain"],
+      "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur", "Nellore", "Kurnool"],
+      "Telangana": ["Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam"],
+      "Bihar": ["Patna", "Gaya", "Muzaffarpur", "Bhagalpur", "Darbhanga"],
+      "Himachal Pradesh": ["Shimla", "Manali", "Dharamshala", "Kullu", "Dalhousie"],
+      "Uttarakhand": ["Dehradun", "Haridwar", "Rishikesh", "Mussoorie", "Nainital"],
+      "Punjab": ["Amritsar", "Ludhiana", "Jalandhar", "Patiala", "Bathinda"],
+      "Odisha": ["Bhubaneswar", "Cuttack", "Rourkela", "Puri", "Sambalpur"],
+      "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode", "Thrissur", "Kollam"],
+      "Assam": ["Guwahati", "Dibrugarh", "Jorhat", "Silchar", "Tezpur"],
+      "Jammu and Kashmir": ["Srinagar", "Jammu", "Leh", "Gulmarg", "Pahalgam"],
+      "Goa": ["Panaji", "Margao", "Vasco da Gama", "Ponda", "Mapusa"]
     };
-  };
 
-  // Render methods
-  const renderCityDropdown = () => {
-    if (!showCityDropdown || !filteredCities.length) return null;
-    
-    return (
-      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
-        {filteredCities.map(city => (
-          <div 
-            key={city}
-            className="p-3 hover:bg-blue-50 cursor-pointer"
-            onClick={() => handleCitySelect(city)}
-          >
-            {city}
-          </div>
-        ))}
-      </div>
-    );
-  };
+    const INDIAN_STATES = Object.keys(STATE_CITIES);
 
-  const renderCurrentWeather = () => {
-    if (!weather) return null;
-    
-    const weatherInfo = getWeatherEmoji(weather.current.condition.weathercode);
-    const bgStyle = getBackgroundStyle(weather.current.condition.weathercode, weather.current.temp_c);
-    
-    return (
-      <div className={`rounded-xl shadow-lg p-6 text-white ${bgStyle}`}>
-        <div className="flex justify-between items-start">
+    const CITY_COORDINATES = {
+      "Mumbai": { lat: 19.0760, lon: 72.8777 },
+      "Delhi": { lat: 28.6139, lon: 77.2090 },
+      "Bangalore": { lat: 12.9716, lon: 77.5946 },
+      "Hyderabad": { lat: 17.3850, lon: 78.4867 },
+      "Chennai": { lat: 13.0827, lon: 80.2707 },
+      "Kolkata": { lat: 22.5726, lon: 88.3639 },
+      "Pune": { lat: 18.5204, lon: 73.8567 },
+      "Ahmedabad": { lat: 23.0225, lon: 72.5714 },
+      "Jaipur": { lat: 26.9124, lon: 75.7873 },
+      "Lucknow": { lat: 26.8467, lon: 80.9462 },
+      "Buldhana": { lat: 20.5287, lon: 76.1790 },
+      "Shimla": { lat: 31.1048, lon: 77.1734 },
+      "Darjeeling": { lat: 27.0410, lon: 88.2663 },
+      "Manali": { lat: 32.2396, lon: 77.1887 }
+    };
+
+    // Helper functions
+    const getCoordinates = (city) => {
+      return CITY_COORDINATES[city] || { lat: 19.0760, lon: 72.8777 };
+    };
+
+    const formatDay = (dateStr) => {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { weekday: 'long' });
+    };
+
+    const formatTime = (timeStr) => {
+      const date = new Date(timeStr);
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    // Components
+    function WeatherDetail({ icon, label, value }) {
+      return (
+        <div className="flex items-center space-x-2 bg-white bg-opacity-20 p-2 rounded-lg">
+          <div className="text-white">{icon}</div>
           <div>
-            <h2 className="text-2xl font-bold">{weather.location.name}</h2>
-            <p className="opacity-90">{weather.location.country}</p>
-            <p className="text-5xl font-bold mt-2">{Math.round(weather.current.temp_c)}°C</p>
-            <p className="text-lg mt-1">{weatherInfo.description}</p>
+            <p className="text-xs text-white opacity-80">{label}</p>
+            <p className="font-bold text-white">{value}</p>
           </div>
-          <div className="text-8xl">{weatherInfo.emoji}</div>
         </div>
+      );
+    }
+
+    function WeatherCard({ day, isToday, onSelect, isSelected }) {
+      if (!day) return null;
+      
+      const weatherInfo = getWeatherEmoji(day.weathercode);
+      
+      return (
+        <div 
+          className={`weather-card bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 cursor-pointer ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
+          onClick={() => onSelect(day.time)}
+        >
+          <div className={`p-4 ${isToday ? 'bg-blue-600' : 'bg-gradient-to-r from-blue-500 to-blue-600'} text-white text-center`}>
+            <h4 className="font-bold text-lg">{formatDay(day.time)}</h4>
+            <p className="text-sm opacity-90">{new Date(day.time).toLocaleDateString()}</p>
+          </div>
+          <div className="p-4">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-4xl">{weatherInfo.emoji}</span>
+              <div className="text-right">
+                <div className="font-bold text-2xl">{Math.round(day.temperature_2m_max)}°C</div>
+                <div className="text-xs text-gray-500">
+                  {Math.round(day.temperature_2m_min)}°C / {Math.round(day.temperature_2m_max)}°C
+                </div>
+              </div>
+            </div>
+            <div className="text-sm font-medium mb-3 text-center">{weatherInfo.description}</div>
+            <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
+              <div className="flex items-center">
+                <Droplets size={14} className="mr-1 text-blue-500" />
+                <span>Humidity: {day.relative_humidity_2m_max}%</span>
+              </div>
+              <div className="flex items-center">
+                <CloudRain size={14} className="mr-1 text-blue-400" />
+                <span>Rain: {Math.round(day.precipitation_probability_max)}%</span>
+              </div>
+            </div>
+            <div className="text-center text-xs text-blue-500 mt-2">
+              Click for hourly forecast
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function HourlyForecast({ hourlyData, selectedDay }) {
+      if (!hourlyData || !hourlyData.length) return null;
+      
+      const todayDate = new Date(selectedDay);
+      todayDate.setHours(0, 0, 0, 0);
+      
+      const tomorrowDate = new Date(todayDate);
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      
+      const filteredHours = hourlyData.filter(hour => {
+        const hourDate = new Date(hour.time);
+        return hourDate >= todayDate && hourDate < tomorrowDate;
+      });
+
+      return (
+        <div className="mt-6 bg-white rounded-xl shadow-lg p-6 overflow-hidden">
+          <h3 className="text-xl font-bold mb-4 flex items-center">
+            <Clock size={20} className="mr-2 text-blue-500" />
+            Hourly Forecast for {new Date(selectedDay).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </h3>
+          
+          <div className="overflow-x-auto pb-2">
+            <div className="flex space-x-4 min-w-max">
+              {filteredHours.map((hour) => {
+                const weatherInfo = getWeatherEmoji(hour.weathercode);
+                const hourTime = new Date(hour.time);
+                const isPast = hourTime < new Date();
+                
+                return (
+                  <div 
+                    key={hour.time} 
+                    className={`flex-shrink-0 w-24 rounded-lg shadow-md p-3 text-center ${isPast ? 'bg-gray-100' : 'bg-blue-50'} transition hover:shadow-lg hover:transform hover:scale-105`}
+                  >
+                    <p className="font-bold text-sm">{formatTime(hour.time)}</p>
+                    <div className="text-2xl my-2">{weatherInfo.emoji}</div>
+                    <p className="font-bold text-lg">{Math.round(hour.temperature_2m)}°C</p>
+                    <p className="text-xs mt-1 text-gray-500">{weatherInfo.description}</p>
+                    <div className="flex items-center justify-center mt-2 text-xs text-gray-600">
+                      <Droplets size={10} className="mr-1 text-blue-500" />
+                      <span>{hour.relative_humidity_2m}%</span>
+                    </div>
+                    <div className="flex items-center justify-center mt-1 text-xs text-gray-600">
+                      <Wind size={10} className="mr-1 text-blue-400" />
+                      <span>{Math.round(hour.windspeed_10m)} km/h</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function LoadingSpinner() {
+      return (
+        <div className="flex flex-col justify-center items-center h-40">
+          <div className="loading-spinner rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+          <p className="mt-4 text-blue-500 font-medium">Loading weather data...</p>
+        </div>
+      );
+    }
+
+    function WeatherApp() {
+      const [searchTerm, setSearchTerm] = useState('');
+      const [selectedCity, setSelectedCity] = useState('Mumbai');
+      const [weather, setWeather] = useState(null);
+      const [hourlyWeather, setHourlyWeather] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+      const [filteredCities, setFilteredCities] = useState([]);
+      const [selectedState, setSelectedState] = useState('');
+      const [showCityDropdown, setShowCityDropdown] = useState(false);
+      const [cities, setCities] = useState(INDIAN_CITIES);
+      const [selectedDay, setSelectedDay] = useState(null);
+
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          if (searchTerm.length > 0) {
+            const filtered = cities.filter(city => 
+              city.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            setFilteredCities(filtered);
+            setShowCityDropdown(true);
+          } else {
+            setFilteredCities([]);
+            setShowCityDropdown(false);
+          }
+        }, 300);
+
+        return () => clearTimeout(timer);
+      }, [searchTerm, cities]);
+
+      useEffect(() => {
+        if (selectedState) {
+          setCities(STATE_CITIES[selectedState] || []);
+        } else {
+          setCities(INDIAN_CITIES);
+        }
+      }, [selectedState]);
+
+      useEffect(() => {
+        fetchWeather(selectedCity);
+      }, []);
+
+      useEffect(() => {
+        if (weather?.forecast?.forecastday?.length > 0) {
+          setSelectedDay(weather.forecast.forecastday[0].time);
+        }
+      }, [weather]);
+
+      async function fetchWeather(city) {
+        setLoading(true);
+        setError('');
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-          <WeatherDetail icon={<Thermometer />} label="Feels Like" value={`${Math.round(weather.current.feelslike_c)}°C`} />
-          <WeatherDetail icon={<Droplets />} label="Humidity" value={`${weather.current.humidity}%`} />
-          <WeatherDetail icon={<Wind />} label="Wind" value={`${Math.round(weather.current.wind_kph)} km/h`} />
-          <WeatherDetail icon={<CloudRain />} label="Precipitation" value={`${weather.current.precip_mm} mm`} />
-        </div>
-      </div>
-    );
-  };
+        try {
+          const coords = getCoordinates(city);
+          const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+          const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,relative_humidity_2m_max&current=temperature_2m,relative_humidity_2m,rain,weathercode,windspeed_10m&timezone=auto`;
+          
+          const [dailyResponse, hourlyResponse] = await Promise.all([
+            fetch(proxyUrl + apiUrl),
+            fetch(proxyUrl + apiUrl.replace('daily', 'hourly'))
+          ]);
 
-  return (
-    <div className="min-h-screen font-sans bg-gradient-to-b from-blue-50 to-blue-100">
-      {/* Header */}
-      <header className="relative overflow-hidden bg-gradient-to-r from-blue-800 to-blue-600 text-white py-6">
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0">
-              <h1 className="text-4xl font-bold mb-1">India Weather Forecast</h1>
-              <p className="text-blue-100">Real-time weather information</p>
+          if (!dailyResponse.ok || !hourlyResponse.ok) {
+            throw new Error('Failed to fetch weather data');
+          }
+
+          const [dailyData, hourlyData] = await Promise.all([
+            dailyResponse.json(),
+            hourlyResponse.json()
+          ]);
+
+          const transformedHourlyData = hourlyData.hourly.time.map((time, index) => ({
+            time,
+            temperature_2m: hourlyData.hourly.temperature_2m[index],
+            relative_humidity_2m: hourlyData.hourly.relative_humidity_2m[index],
+            precipitation_probability: hourlyData.hourly.precipitation_probability[index],
+            weathercode: hourlyData.hourly.weathercode[index],
+            windspeed_10m: hourlyData.hourly.windspeed_10m[index]
+          }));
+          
+          setHourlyWeather(transformedHourlyData);
+          
+          const transformedData = {
+            location: {
+              name: city,
+              country: "India",
+              localtime: new Date().toISOString()
+            },
+            current: {
+              temp_c: dailyData.current.temperature_2m,
+              condition: {
+                text: getWeatherEmoji(dailyData.current.weathercode).description,
+                weathercode: dailyData.current.weathercode
+              },
+              wind_kph: dailyData.current.windspeed_10m,
+              humidity: dailyData.current.relative_humidity_2m,
+              feelslike_c: dailyData.current.temperature_2m,
+              precip_mm: dailyData.current.rain || 0,
+            },
+            forecast: {
+              forecastday: dailyData.daily.time.map((time, index) => ({
+                time,
+                weathercode: dailyData.daily.weathercode[index],
+                temperature_2m_max: dailyData.daily.temperature_2m_max[index],
+                temperature_2m_min: dailyData.daily.temperature_2m_min[index],
+                precipitation_probability_max: dailyData.daily.precipitation_probability_max[index],
+                relative_humidity_2m_max: dailyData.daily.relative_humidity_2m_max[index]
+              }))
+            }
+          };
+          
+          setWeather(transformedData);
+          setSelectedCity(city);
+        } catch (err) {
+          console.error("Error fetching weather:", err);
+          setError(err.message || 'Error fetching weather data');
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      function handleCitySelect(city) {
+        setSearchTerm('');
+        setSelectedCity(city);
+        setShowCityDropdown(false);
+        fetchWeather(city);
+      }
+
+      function handleStateChange(e) {
+        setSelectedState(e.target.value);
+      }
+
+      function handleDaySelect(dayTime) {
+        setSelectedDay(dayTime);
+      }
+
+      function getWeatherEmoji(weatherCode) {
+        const weatherConditions = {
+          0: 'Clear',
+          1: 'Mainly clear',
+          2: 'Partly cloudy',
+          3: 'Overcast',
+          45: 'Fog',
+          48: 'Depositing rime fog',
+          51: 'Light drizzle',
+          53: 'Moderate drizzle',
+          55: 'Dense drizzle',
+          56: 'Light freezing drizzle',
+          57: 'Dense freezing drizzle',
+          61: 'Slight rain',
+          63: 'Moderate rain',
+          65: 'Heavy rain',
+          66: 'Light freezing rain',
+          67: 'Heavy freezing rain',
+          71: 'Slight snow fall',
+          73: 'Moderate snow fall',
+          75: 'Heavy snow fall',
+          77: 'Snow grains',
+          80: 'Slight rain showers',
+          81: 'Moderate rain showers',
+          82: 'Violent rain showers',
+          85: 'Slight snow showers',
+          86: 'Heavy snow showers',
+          95: 'Thunderstorm',
+          96: 'Thunderstorm with slight hail',
+          99: 'Thunderstorm with heavy hail'
+        };
+        
+        const condition = weatherConditions[weatherCode] || 'default';
+        return {
+          emoji: weatherEmojis[condition] || '🌈',
+          description: condition
+        };
+      }
+
+      function getBackgroundStyle(weatherCode, tempC) {
+        if (!weatherCode && !tempC) return 'bg-gradient-to-br from-blue-400 to-blue-200';
+        
+        if (weatherCode === 0 || weatherCode === 1) {
+          return tempC > 25 
+            ? 'bg-gradient-to-br from-yellow-400 to-orange-300'
+            : 'bg-gradient-to-br from-blue-400 to-blue-200';
+        }
+        
+        if (weatherCode === 2) return 'bg-gradient-to-br from-blue-300 to-gray-200';
+        if (weatherCode === 3) return 'bg-gradient-to-br from-gray-400 to-gray-300';
+        if (weatherCode === 45 || weatherCode === 48) return 'bg-gradient-to-br from-gray-300 to-gray-400';
+        if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(weatherCode)) return 'bg-gradient-to-br from-slate-700 to-slate-500';
+        if ([71,73,75,77,85,86].includes(weatherCode)) return 'bg-gradient-to-br from-blue-100 to-slate-300';
+        if ([95,96,99].includes(weatherCode)) return 'bg-gradient-to-br from-slate-900 to-purple-700';
+        
+        if (tempC > 30) return 'bg-gradient-to-br from-orange-500 to-yellow-300';
+        if (tempC > 20) return 'bg-gradient-to-br from-yellow-400 to-blue-300';
+        if (tempC > 10) return 'bg-gradient-to-br from-blue-400 to-blue-200';
+        return 'bg-gradient-to-br from-blue-600 to-blue-300';
+      }
+
+      function renderCurrentWeather() {
+        if (!weather) return null;
+        
+        const weatherInfo = getWeatherEmoji(weather.current.condition.weathercode);
+        const bgStyle = getBackgroundStyle(weather.current.condition.weathercode, weather.current.temp_c);
+        
+        return (
+          <div className={`rounded-xl shadow-lg p-6 text-white ${bgStyle}`}>
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-2xl font-bold">{weather.location.name}</h2>
+                <p className="opacity-90">{weather.location.country}</p>
+                <p className="text-5xl font-bold mt-2">{Math.round(weather.current.temp_c)}°C</p>
+                <p className="text-lg mt-1">{weatherInfo.description}</p>
+              </div>
+              <div className="text-8xl">{weatherInfo.emoji}</div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Sun size={20} className="text-yellow-300 animate-pulse" />
-              <CloudRain size={20} className="text-blue-300" />
-              <CloudSnow size={20} className="text-white" />
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+              <WeatherDetail icon={<Thermometer />} label="Feels Like" value={`${Math.round(weather.current.feelslike_c)}°C`} />
+              <WeatherDetail icon={<Droplets />} label="Humidity" value={`${weather.current.humidity}%`} />
+              <WeatherDetail icon={<Wind />} label="Wind" value={`${Math.round(weather.current.wind_kph)} km/h`} />
+              <WeatherDetail icon={<CloudRain />} label="Precipitation" value={`${weather.current.precip_mm} mm`} />
             </div>
           </div>
-        </div>
-      </header>
+        );
+      }
 
-      {/* Main content */}
-      <div className="container mx-auto p-4">
-        {/* Search section */}
-        <div className="bg-white shadow-lg rounded-lg p-6 mt-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-grow">
-              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-400">
-                <input
-                  type="text"
-                  className="w-full p-3 focus:outline-none"
-                  placeholder="Search city..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <button 
-                  className="bg-blue-500 hover:bg-blue-600 text-white p-3 transition"
-                  onClick={() => searchTerm && handleCitySelect(searchTerm)}
+      function renderCityDropdown() {
+        if (!showCityDropdown || !filteredCities.length) return null;
+        
+        return (
+          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+            {filteredCities.map(city => (
+              <div 
+                key={city}
+                className="p-3 hover:bg-blue-50 cursor-pointer"
+                onClick={() => handleCitySelect(city)}
+              >
+                {city}
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen">
+          <header className="bg-gradient-header text-white py-6">
+            <div className="container">
+              <div className="flex flex-col md:flex-row justify-between items-center">
+                <div className="mb-4 md:mb-0">
+                  <h1 className="text-4xl font-bold mb-1">India Weather Forecast</h1>
+                  <p className="text-blue-100">Real-time weather information</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Sun size={20} className="text-yellow-300 animate-pulse" />
+                  <CloudRain size={20} className="text-blue-300" />
+                  <CloudSnow size={20} className="text-white" />
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="container p-4">
+            <div className="bg-white shadow-lg rounded-lg p-6 mt-4 mb-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-grow">
+                  <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-400">
+                    <input
+                      type="text"
+                      className="w-full p-3 focus:outline-none"
+                      placeholder="Search city..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <button 
+                      className="bg-blue-500 hover:bg-blue-600 text-white p-3 transition"
+                      onClick={() => searchTerm && handleCitySelect(searchTerm)}
+                    >
+                      <Search size={20} />
+                    </button>
+                  </div>
+                  {renderCityDropdown()}
+                </div>
+                
+                <select 
+                  className="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-400"
+                  value={selectedState}
+                  onChange={handleStateChange}
                 >
-                  <Search size={20} />
-                </button>
+                  <option value="">All States</option>
+                  {INDIAN_STATES.map(state => (
+                    <option key={state} value={state}>{state}</option>
+                  ))}
+                </select>
               </div>
-              {renderCityDropdown()}
             </div>
-            
-            <select 
-              className="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-400"
-              value={selectedState}
-              onChange={handleStateChange}
-            >
-              <option value="">All States</option>
-              {INDIAN_STATES.map(state => (
-                <option key={state} value={state}>{state}</option>
-              ))}
-            </select>
+
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                {error}
+              </div>
+            )}
+
+            {loading && <LoadingSpinner />}
+
+            {!loading && weather && (
+              <>
+                {renderCurrentWeather()}
+                
+                <div className="mt-8">
+                  <h3 className="text-xl font-bold mb-4">5-Day Forecast</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {weather.forecast.forecastday.map((day, index) => (
+                      <WeatherCard 
+                        key={day.time}
+                        day={day}
+                        isToday={index === 0}
+                        isSelected={day.time === selectedDay}
+                        onSelect={handleDaySelect}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {selectedDay && (
+                  <HourlyForecast 
+                    hourlyData={hourlyWeather}
+                    selectedDay={selectedDay}
+                  />
+                )}
+              </>
+            )}
           </div>
         </div>
+      );
+    }
 
-        {/* Error message */}
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
-        )}
-
-        {/* Loading state */}
-        {loading && <LoadingSpinner />}
-
-        {/* Weather display */}
-        {!loading && weather && (
-          <>
-            {renderCurrentWeather()}
-            
-            {/* Forecast section */}
-            <div className="mt-8">
-              <h3 className="text-xl font-bold mb-4">5-Day Forecast</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {weather.forecast.forecastday.map((day, index) => (
-                  <WeatherCard 
-                    key={day.time}
-                    day={day}
-                    isToday={index === 0}
-                    isSelected={day.time === selectedDay}
-                    onSelect={handleDaySelect}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Hourly forecast */}
-            {selectedDay && (
-              <HourlyForecast 
-                hourlyData={hourlyWeather}
-                selectedDay={selectedDay}
-              />
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Helper components remain the same (WeatherCard, HourlyForecast, LoadingSpinner, etc.)
-
-export default WeatherApp;
+    // Render the app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<WeatherApp />);
+  </script>
+</body>
+</html>
