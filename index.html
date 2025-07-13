@@ -3,121 +3,287 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>India Weather App</title>
-  <!-- Load React and Babel from CDN -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <title>Agro Weather App</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- Load Lucide icons -->
-  <script src="https://unpkg.com/lucide-react@latest"></script>
   <style>
+    :root {
+      --soil-moisture: #8B4513;
+      --crop-health: #4CAF50;
+    }
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 0;
-      padding: 0;
-      background: linear-gradient(to bottom, #ebf4ff, #b3d1ff);
+      font-family: 'Roboto', Arial, sans-serif;
+      background: linear-gradient(to bottom, #E6F7FF, #B3E0FF);
       min-height: 100vh;
+      margin: 0;
+      padding: 20px;
     }
     .container {
-      max-width: 1200px;
+      max-width: 650px;
       margin: 0 auto;
-      padding: 0 1rem;
+      background: rgba(255,255,255,0.95);
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
-    .bg-gradient-header {
-      background: linear-gradient(to right, #1e3a8a, #2563eb);
+    .agro-header {
+      background: linear-gradient(to right, #388E3C, #4CAF50);
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      text-align: center;
     }
-    .weather-card {
-      transition: all 0.3s ease;
+    select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      font-size: 16px;
+      margin-bottom: 20px;
+      background: white;
     }
-    .weather-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    .agro-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
     }
-    .loading-spinner {
-      animation: spin 1s linear infinite;
+    .crop-advice {
+      background: #FFF8E1;
+      border-left: 4px solid #FFC107;
+      padding: 15px;
+      margin: 15px 0;
     }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    .soil-moisture-bar {
+      height: 20px;
+      background: linear-gradient(to right, #D2B48C, var(--soil-moisture));
+      border-radius: 10px;
+      margin: 10px 0;
     }
-    /* Add Tailwind-like utility classes */
-    .flex { display: flex; }
-    .flex-col { flex-direction: column; }
-    .items-center { align-items: center; }
-    .justify-center { justify-content: center; }
-    .justify-between { justify-content: space-between; }
-    .rounded-lg { border-radius: 0.5rem; }
-    .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-    .p-6 { padding: 1.5rem; }
-    .mt-4 { margin-top: 1rem; }
-    .mb-4 { margin-bottom: 1rem; }
-    .text-white { color: white; }
-    .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
-    .font-bold { font-weight: 700; }
-    /* Add more utility classes as needed */
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .detail-item {
+      background: #F5F5F5;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .weather-icon {
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
   </style>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div id="root"></div>
 
   <script type="text/babel">
-    // Main App Component
-    function App() {
-      const [weather, setWeather] = React.useState(null);
-      const [loading, setLoading] = React.useState(true);
-      
-      // Sample data to verify rendering
-      React.useEffect(() => {
-        setTimeout(() => {
-          setWeather({
-            location: {
-              name: "Mumbai",
-              country: "India"
-            },
-            current: {
-              temp_c: 28,
-              condition: {
-                text: "Partly cloudy"
-              }
-            }
-          });
-          setLoading(false);
-        }, 1000);
-      }, []);
-      
-      if (loading) {
-        return (
-          <div className="flex justify-center items-center h-screen">
-            <div className="loading-spinner rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-          </div>
-        );
-      }
-      
+    const { useState, useEffect } = React;
+
+    function AgroWeatherApp() {
+      const [weather, setWeather] = useState(null);
+      const [agroData, setAgroData] = useState(null);
+      const [city, setCity] = useState("Buldhana");
+      const [lastUpdated, setLastUpdated] = useState("");
+
+      const cityDatabase = {
+        // Maharashtra cities
+        "Buldhana": { lat: 20.5287, lon: 76.1790, crops: ["Cotton", "Soybean", "Pigeonpea"] },
+        "Akola": { lat: 20.7096, lon: 77.0022, crops: ["Cotton", "Soybean", "Wheat"] },
+        "Amravati": { lat: 20.9374, lon: 77.7796, crops: ["Orange", "Cotton", "Chickpea"] },
+        "Washim": { lat: 20.1110, lon: 77.1330, crops: ["Soybean", "Turmeric", "Sorghum"] },
+        "Yavatmal": { lat: 20.3888, lon: 78.1204, crops: ["Cotton", "Pigeonpea", "Sorghum"] },
+        
+        // Other regions
+        "Nashik": { lat: 20.0059, lon: 73.7918, crops: ["Grapes", "Onion", "Tomato"] },
+        "Nagpur": { lat: 21.1458, lon: 79.0882, crops: ["Orange", "Cotton", "Chickpea"] }
+      };
+
+      const getCropAdvice = (weatherData) => {
+        const { temp, humidity, rain } = weatherData;
+        
+        if (rain > 5) {
+          return "Delay irrigation and ensure proper drainage to prevent waterlogging.";
+        }
+        if (temp > 35 && humidity < 50) {
+          return "Increase irrigation frequency to prevent crop stress.";
+        }
+        if (temp < 15) {
+          return "Protect young seedlings from cold weather with covers.";
+        }
+        return "Normal farming operations recommended. Monitor weather changes.";
+      };
+
+      const calculateSoilMoisture = (rain, humidity, temp) => {
+        // Simplified soil moisture calculation
+        let moisture = (rain * 2) + (humidity / 2) - (temp > 30 ? temp - 30 : 0);
+        return Math.min(100, Math.max(0, Math.round(moisture)));
+      };
+
+      useEffect(() => {
+        const fetchWeather = async () => {
+          try {
+            const { lat, lon } = cityDatabase[city] || cityDatabase["Buldhana"];
+            
+            // Fetch weather data
+            const weatherResponse = await fetch(
+              `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&daily=precipitation_sum&timezone=auto`
+            );
+            const weatherData = await weatherResponse.json();
+            
+            // Generate agricultural data
+            const soilMoisture = calculateSoilMoisture(
+              weatherData.current.precipitation,
+              weatherData.current.relative_humidity_2m,
+              weatherData.current.temperature_2m
+            );
+            
+            setWeather({
+              temp: weatherData.current.temperature_2m,
+              humidity: weatherData.current.relative_humidity_2m,
+              wind: weatherData.current.wind_speed_10m,
+              rain: weatherData.current.precipitation,
+              rainSum: weatherData.daily.precipitation_sum[0],
+              weatherCode: weatherData.current.weather_code,
+              soilMoisture: soilMoisture
+            });
+            
+            setAgroData({
+              crops: cityDatabase[city].crops,
+              advice: getCropAdvice({
+                temp: weatherData.current.temperature_2m,
+                humidity: weatherData.current.relative_humidity_2m,
+                rain: weatherData.daily.precipitation_sum[0]
+              }),
+              risk: soilMoisture < 30 ? "Drought Risk" : 
+                    soilMoisture > 80 ? "Waterlogging Risk" : "Normal"
+            });
+            
+            setLastUpdated(new Date().toLocaleTimeString());
+          } catch (error) {
+            console.error("Error fetching data:", error);
+          }
+        };
+
+        fetchWeather();
+        const interval = setInterval(fetchWeather, 600000); // 10 minute updates
+        return () => clearInterval(interval);
+      }, [city]);
+
+      const getWeatherIcon = (code) => {
+        const icons = {
+          0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
+          45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌧️",
+          55: "🌧️", 61: "🌧️", 63: "🌧️", 65: "🌧️",
+          80: "🌦️", 81: "🌧️", 82: "🌧️", 95: "⛈️"
+        };
+        return icons[code] || "🌈";
+      };
+
       return (
-        <div className="container mx-auto p-4">
-          <header className="bg-gradient-header text-white py-6 rounded-lg mb-6">
-            <h1 className="text-4xl font-bold text-center">India Weather App</h1>
-          </header>
-          
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-2xl font-bold mb-2">{weather.location.name}, {weather.location.country}</h2>
-            <div className="flex items-center">
-              <span className="text-5xl font-bold mr-4">{weather.current.temp_c}°C</span>
-              <span>{weather.current.condition.text}</span>
-            </div>
-            <p className="mt-4">This is a basic weather app. More features will be displayed here.</p>
+        <div className="container">
+          <div className="agro-header">
+            <h1>Agro Weather Advisor</h1>
+            <p>Real-time agricultural weather for Maharashtra</p>
           </div>
+          
+          <select value={city} onChange={(e) => setCity(e.target.value)}>
+            {Object.keys(cityDatabase).map(city => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </select>
+          
+          {weather && agroData ? (
+            <>
+              <div className="agro-card">
+                <h2 style={{marginTop: 0}}>{city} Agricultural Weather</h2>
+                <div style={{display: 'flex', alignItems: 'center', gap: '20px'}}>
+                  <span className="weather-icon">{getWeatherIcon(weather.weatherCode)}</span>
+                  <div>
+                    <div style={{fontSize: '2.5rem', fontWeight: 'bold'}}>
+                      {Math.round(weather.temp)}°C
+                    </div>
+                    <div>Humidity: {weather.humidity}%</div>
+                  </div>
+                </div>
+                
+                <div className="detail-grid">
+                  <div className="detail-item">
+                    <div>🌧️ Today's Rain</div>
+                    <div style={{fontWeight: 'bold'}}>{weather.rainSum} mm</div>
+                  </div>
+                  <div className="detail-item">
+                    <div>💨 Wind Speed</div>
+                    <div style={{fontWeight: 'bold'}}>{Math.round(weather.wind)} km/h</div>
+                  </div>
+                  <div className="detail-item">
+                    <div>⚠️ Risk Level</div>
+                    <div style={{
+                      fontWeight: 'bold',
+                      color: agroData.risk.includes("Drought") ? "red" : 
+                            agroData.risk.includes("Waterlogging") ? "blue" : "green"
+                    }}>
+                      {agroData.risk}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="agro-card">
+                <h3>Soil Conditions</h3>
+                <div>Moisture Level: {weather.soilMoisture}%</div>
+                <div className="soil-moisture-bar" style={{
+                  width: `${weather.soilMoisture}%`,
+                  backgroundColor: weather.soilMoisture < 40 ? '#D2B48C' : 
+                                 weather.soilMoisture > 70 ? '#654321' : '#8B4513'
+                }}></div>
+                <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                  <span>Dry</span>
+                  <span>Ideal</span>
+                  <span>Wet</span>
+                </div>
+              </div>
+              
+              <div className="agro-card">
+                <h3>Crop Information</h3>
+                <p>Major Crops: {agroData.crops.join(", ")}</p>
+                
+                <div className="crop-advice">
+                  <h4 style={{marginTop: 0}}>Farmers Advisory</h4>
+                  <p>{agroData.advice}</p>
+                  {agroData.risk.includes("Drought") && (
+                    <p>💧 Consider irrigation if crops show stress signs.</p>
+                  )}
+                  {agroData.risk.includes("Waterlogging") && (
+                    <p>🚜 Improve field drainage to prevent root damage.</p>
+                  )}
+                </div>
+              </div>
+              
+              <div style={{textAlign: 'center', color: '#666', fontSize: '0.9rem'}}>
+                Last updated: {lastUpdated}
+              </div>
+            </>
+          ) : (
+            <div style={{textAlign: 'center', padding: '40px'}}>
+              <h3>Loading agricultural data for {city}...</h3>
+              <p>Please wait while we fetch the latest farm weather</p>
+            </div>
+          )}
         </div>
       );
     }
 
-    // Render the app
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(
-      <React.StrictMode>
-        <App />
-      </React.StrictMode>
-    );
+    root.render(<AgroWeatherApp />);
   </script>
 </body>
 </html>
